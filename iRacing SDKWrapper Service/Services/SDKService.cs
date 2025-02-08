@@ -154,10 +154,6 @@ namespace iRacing_SDKWrapper_Service.Services
 
         private void SessionInfoUpdated(object? sender, SdkWrapper.SessionInfoUpdatedEventArgs e)
         {
-            //var yaml = e.SessionInfo.Yaml;
-            //var rawYaml = e.SessionInfo.RawYaml;
-            //Console.WriteLine("SessionInfoUpdated()");
-            //Console.WriteLine(e.SessionInfo["WeekendInfo"]["TrackLength"]);
         }
 
         public async void SDKDisconnected(object sender, EventArgs e)
