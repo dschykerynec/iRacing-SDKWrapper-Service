@@ -100,14 +100,6 @@ namespace iRacing_SDKWrapper_Service.Services
 
             if (ws.State == WebSocketState.Open)
             {
-                if (name == "game-opened")
-                {
-                    Console.WriteLine("SENDING game-opened MESSAGE");
-                }
-                if (name =="isOnTrack")
-                {
-                    Console.WriteLine($"SENDING is-on-track: {value}");
-                }
                 //Console.WriteLine($"OUTGOING MESSAGE: {message}");
                 await ws.SendAsync(arraySegment, WebSocketMessageType.Text, true, cancellationToken);
             }
