@@ -100,13 +100,9 @@ namespace iRacing_SDKWrapper_Service.Services
 
             if (ws.State == WebSocketState.Open)
             {
-                //Console.WriteLine($"OUTGOING MESSAGE: {message}");
                 await ws.SendAsync(arraySegment, WebSocketMessageType.Text, true, cancellationToken);
             }
-            //else if (name == "IsOnTrack" && (bool)value == true && ws.State === WebSocketState.)
-            //{
 
-            //}
             else if (ws.State == WebSocketState.Aborted)
             {
                 Console.WriteLine("SendMessage() else if (ws.State == WebSocketState.Aborted)");
