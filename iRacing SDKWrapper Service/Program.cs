@@ -4,7 +4,6 @@ using iRacing_SDKWrapper_Service.Services;
 
 using Velopack;
 using Velopack.Sources;
-using Microsoft.Extensions.Logging.Configuration;
 
 #if RELEASE
 string logFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "iRacing-SDKWrapper-Service", "logs", "main.log");
@@ -25,8 +24,8 @@ builder.Host.UseSerilog();
 // Register services
 builder.Services.AddSingleton<ISDKService, SDKService>();
 builder.Services.AddSingleton<IWebSocketService, WebSocketService>();
-builder.Services.AddHostedService<StartupService>();
 builder.Services.AddSingleton<IUserPreferencesService, UserPreferencesService>();
+builder.Services.AddHostedService<StartupService>();
 
 var app = builder.Build();
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
@@ -34,10 +33,10 @@ var userPreferencesService = app.Services.GetRequiredService<IUserPreferencesSer
 
 var userPreferences = userPreferencesService.Load();
 
+builder.WebHost.UseUrls($"http://localhost:{userPreferences.PortNumber}");
+
 logger.LogInformation("--------------------------------------------------------------------------------------");
 Log.Information("Loaded user preferences: {@UserPreferences}", userPreferences);
-
-builder.WebHost.UseUrls("http://localhost:7125");
 
 VelopackApp.Build().Run();
 async Task UpdateMyApp()
