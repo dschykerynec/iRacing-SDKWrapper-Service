@@ -361,3 +361,16 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Ignore any folders called "log" or "logs"
+log/
+logs/
+
+publish/
+Publish/
+Releases/
+
+bin/
+obj/
+
+.env
