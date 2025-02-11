@@ -1,13 +1,17 @@
 ﻿using System.Net.WebSockets;
 using System.Collections.Concurrent;
 
+
 namespace iRacing_SDKWrapper_Service.Services
 {
     public class StartupService: IHostedService
     {
         private readonly IWebSocketService _webSocketService;
         private readonly ISDKService _sdkService;
+        private readonly IUserPreferencesService _userPreferencesService;
         private readonly ILogger _logger;
+
+        private readonly UserPreferences _userPreferences;
 
         // will be used to queue messages that need to be sent to the client
         // that have a chance to be sent before the client is connected
@@ -15,12 +19,14 @@ namespace iRacing_SDKWrapper_Service.Services
         // is connected to the web socket service
         private readonly ConcurrentQueue<(string, object)> _messageQueue = new();
 
-        public StartupService(IWebSocketService webSocketService, ISDKService sdkService, ILogger<StartupService> logger)
+        public StartupService(IWebSocketService webSocketService, ISDKService sdkService, IUserPreferencesService userPreferencesService, ILogger<StartupService> logger)
         {
             _webSocketService = webSocketService;
             _sdkService = sdkService;
+            _userPreferencesService = userPreferencesService;
             _logger = logger;
 
+            _userPreferences = _userPreferencesService.Load();
         }
         public async Task StartAsync(CancellationToken cancellationToken)
         {
@@ -69,12 +75,16 @@ namespace iRacing_SDKWrapper_Service.Services
 
         private void ProcessWebSocketConnection(object sender, WebSocketConnectedEventArgs e)
         {
-            //_sdkService.TelemetryUpdated += ProcessTelemetry;
             _logger.LogInformation("ProcessWebSocketConnection event in StartupService. WebSocket State: " + e.WsState);
-            // periodically attempt to dequeue all queued messages. This covers the edge case for when
-            // 
+
             if (e.WsState == WebSocketState.Open)
             {
+                // loop to continuously process queued messages. These messages are important events that UIs can build on to trigger
+                // events such as enabling/disabling a window or some other event
+                // queued messages will have a delay before processing to reduce CPU load, so time sensitive messages such as inputs should
+                // not be queued. Good candidates for queueing are on-track/off-track events since these are rare but important for the UIs
+                // to toggle themselves on or off so that they don't cover the settings menu or other important UI elements
+                // also should significantly reduce CPU usage since the UIs will not be constantly polling the SDK for updates
                 Task.Run(async () =>
                 {
                     while (true)
@@ -84,16 +94,21 @@ namespace iRacing_SDKWrapper_Service.Services
                             _logger.LogInformation($"Dequeued message: {message}");
                             _webSocketService.SendMessage(message.Item1, message.Item2);
 
+                            // reduces polling update frequency to 1hz when user's car is not on track to reduce CPU usage
+                            // this logic is not sufficient to handle the case where the user is using replay mode
+                            // TODO: add a check for replay mode
                             if (message.Item1 == "is-on-track" && (bool)message.Item2 == true)
                             {
-                                _sdkService.ChangeTelemetryUpdateFrequency(20);
+                                _logger.LogInformation($"Car is on track. Setting telemetry update frequency from user preference. {_userPreferences.TelemetryUpdateFrequency}");
+                                _sdkService.ChangeTelemetryUpdateFrequency(_userPreferences.TelemetryUpdateFrequency);
                             }
                             else if (message.Item1 == "is-on-track" && (bool)message.Item2 == false)
                             {
                                 _sdkService.ChangeTelemetryUpdateFrequency(1);
                             }
                         }
-                        await Task.Delay(1500); // Wait for 1 second before trying to dequeue again
+                        // Wait some time before trying to dequeue again.
+                        await Task.Delay(1500);
                     }
                 });
             }
@@ -102,7 +117,6 @@ namespace iRacing_SDKWrapper_Service.Services
         private void ProcessWebSocketDisconnection(object sender, WebSocketClosedEventArgs e)
         {
             _logger.LogInformation("ProcessWebSocketDisconnection event in StartupService. CloseStatusDescription: " + e.CloseStatusDescription);
-            //_sdkService.TelemetryUpdated -= ProcessTelemetry;
         }
     }
 }
