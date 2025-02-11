@@ -4,6 +4,26 @@ using System.Net.WebSockets;
 
 using iRacing_SDKWrapper_Service.Services;
 
+using Velopack;
+using System.Threading.Tasks;
+
+VelopackApp.Build().Run();
+async Task UpdateMyApp()
+{
+    var mgr = new UpdateManager("https://github.com/dschykerynec/iRacing-SDKWrapper-Service/releases/latest");
+
+    // check for new version
+    var newVersion = await mgr.CheckForUpdatesAsync();
+    if (newVersion == null)
+        return; // no update available
+
+    // download new version
+    await mgr.DownloadUpdatesAsync(newVersion);
+
+    // install new version and restart app
+    mgr.ApplyUpdatesAndRestart(newVersion);
+}
+
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls("http://localhost:7125");
 
@@ -25,7 +45,6 @@ app.Map("/sdk", async context =>
     Console.WriteLine("app.Map(/sdk) called");
     if (context.WebSockets.IsWebSocketRequest)
     {
-        Console.WriteLine("WEB SOCKET REQUEST");
         using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
         var socketFinishedTcs = new TaskCompletionSource<object>();
 
@@ -36,6 +55,7 @@ app.Map("/sdk", async context =>
     }
     else
     {
+        Console.WriteLine("failed to connect");
         context.Response.StatusCode = 400;
     }
 });

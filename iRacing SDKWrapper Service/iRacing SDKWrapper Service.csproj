@@ -1,21 +1,43 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>iRacing_SDKWrapper_Service</RootNamespace>
     <OutputType>WinExe</OutputType>
+    <RepositoryUrl>https://github.com/dschykerynec/iRacing-SDKWrapper-Service</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
+    <IsPackable>true</IsPackable>
+	<PackageId>iRacing.SDKWrapper.Service</PackageId>
+	<UseWindowsForms>False</UseWindowsForms>
+	<UseWPF>False</UseWPF>
+
+	<NoWarn>NU1701</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Events\**" />
+    <Content Remove="Events\**" />
+    <EmbeddedResource Remove="Events\**" />
+    <None Remove="Events\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="iRacingSdkWrapper">
-      <HintPath>..\..\iRacingSdkWrapper-master\iRacingSdkWrapper\bin\Release\iRacingSdkWrapper.dll</HintPath>
+      <HintPath>..\packages\iRacingSdkWrapper\iRacingSdkWrapper.dll</HintPath>
+    </Reference>
+    <Reference Include="iRSDKSharp">
+      <HintPath>..\packages\iRacingSdkWrapper\iRSDKSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="YamlDotNet">
+      <HintPath>..\packages\iRacingSdkWrapper\YamlDotNet.dll</HintPath>
     </Reference>
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Events\" />
+    <PackageReference Include="Velopack" Version="0.0.1053" />
   </ItemGroup>
 
 </Project>
