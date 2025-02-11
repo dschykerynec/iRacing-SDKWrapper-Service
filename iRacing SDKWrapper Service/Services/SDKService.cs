@@ -1,7 +1,4 @@
-﻿using System.Collections.Generic;
-
-using iRacingSdkWrapper;
-//using iRacing_SDKWrapper_Service.Events;
+﻿using iRacingSdkWrapper;
 
 namespace iRacing_SDKWrapper_Service.Services
 {
@@ -34,9 +31,10 @@ namespace iRacing_SDKWrapper_Service.Services
         }
     }
 
-    public class SDKService: ISDKService
+    public class SDKService(ILogger<SDKService> logger) : ISDKService
     {
         static SdkWrapper? wrapper;
+        private readonly ILogger _logger = logger;
 
         private int lapNum { get; set; }
         private bool isOnTrack { get; set; }
@@ -73,6 +71,7 @@ namespace iRacing_SDKWrapper_Service.Services
 
         public async void StartSDK()
         {
+            _logger.LogInformation("SDK started");
             // Create a new instance of the SdkWrapper object
             wrapper = new SdkWrapper();
 
@@ -146,7 +145,7 @@ namespace iRacing_SDKWrapper_Service.Services
 
         public async void SDKConnected(object sender, EventArgs e)
         {
-            Console.WriteLine("iRacing SDK Connected! :)");
+            _logger.LogInformation("iRacing SDK Connected! :)");
             wrapper.TelemetryUpdated += SDKTelemetryUpdated;
             wrapper.SessionInfoUpdated += SessionInfoUpdated;
             OnSDKConnectedEvent(new SDKConnectionEventArgs("Connected"));
@@ -154,11 +153,12 @@ namespace iRacing_SDKWrapper_Service.Services
 
         private void SessionInfoUpdated(object? sender, SdkWrapper.SessionInfoUpdatedEventArgs e)
         {
+            // todo: implement
         }
 
         public async void SDKDisconnected(object sender, EventArgs e)
         {
-            Console.WriteLine("iRacing SDK disconnected!");
+            _logger.LogInformation("SDK disconnected!");
 
             wrapper.TelemetryUpdated -= SDKTelemetryUpdated;
             wrapper.SessionInfoUpdated -= SessionInfoUpdated;

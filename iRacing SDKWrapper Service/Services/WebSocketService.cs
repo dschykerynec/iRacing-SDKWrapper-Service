@@ -1,13 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
-using System;
-using System.Net;
-using System.Net.Sockets;
-using System.Net.WebSockets;
+﻿using System.Net.WebSockets;
 using System.Text;
-using System.Threading;
 using System.Text.Json;
-using System.Collections.Concurrent;
 
 namespace iRacing_SDKWrapper_Service.Services
 {
@@ -29,9 +22,10 @@ namespace iRacing_SDKWrapper_Service.Services
             CloseStatusDescription = closeStatusDescription;
         }
     }
-    public class WebSocketService: IWebSocketService
+    public class WebSocketService(ILogger<WebSocketService> logger): IWebSocketService
     {
         private WebSocket ws;
+        private readonly ILogger _logger = logger;
         CancellationToken cancellationToken;
         TaskCompletionSource<object> tcs;
 
@@ -59,6 +53,7 @@ namespace iRacing_SDKWrapper_Service.Services
 
         private async Task CloseSocket()
         {
+            _logger.LogInformation("CloseSocket()");
             if (ws != null)
             {
                 if (ws.State == WebSocketState.Open)
@@ -105,7 +100,7 @@ namespace iRacing_SDKWrapper_Service.Services
 
             else if (ws.State == WebSocketState.Aborted)
             {
-                Console.WriteLine("SendMessage() else if (ws.State == WebSocketState.Aborted)");
+                _logger.LogInformation("SendMessage() else if (ws.State == WebSocketState.Aborted)");
                 OnWebSocketClosedEvent(new WebSocketClosedEventArgs("Connection aborted"));
             }
 
@@ -120,13 +115,13 @@ namespace iRacing_SDKWrapper_Service.Services
                 var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken);
                 if (result.MessageType == WebSocketMessageType.Close)
                 {
-                    Console.WriteLine("ReceiveMessages()");
+                    _logger.LogInformation("ReceiveMessages()");
                     OnWebSocketClosedEvent(new WebSocketClosedEventArgs($"Connection closed: {result.CloseStatus}, {result.CloseStatusDescription}"));
                 }
                 else
                 {
                     var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                    Console.WriteLine($"Received message: {message}");
+                    _logger.LogInformation($"Received message: {message}");
                     // Handle the received message as needed
                 }
             }
