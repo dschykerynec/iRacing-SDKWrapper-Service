@@ -10,6 +10,14 @@ This project, although in very early development, aims to solve this problem by 
 
 Another significant motivation is that I like to build stuff and I like to learn. Building this and extending it as I need more data to build my own UI project is fun. It is unlikely that this will be a comprable solution to any of the above-mentioned projects any time soon.
 
+## Install
+
+Navigate to the [latest release](https://github.com/dschykerynec/iRacing-SDKWrapper-Service/releases/latest) page. Download and run the setup.exe file. That's all! The app will automatically update itself as I publish updates to the release page.
+
+The app itself installs to ```user_name/AppData/Local/```. I recommened adding the program executable run on windows startup. Alternatively, you can use [iRacingManager](https://members.iracing.com/jforum/posts/list/3633292.page?nc=1) to run it when iRacing is opened. This is the method I use. When I open iRacing, iRacingManager opens CrewChief, the VRS Telemetry logger, Trading Paints for liveries, iOverlay for their free live track map, and both this app and my simple-overlay. It also closes all these programs when the simulator is closed. I prefer having just iRacingManager running in the background rather than all of these programs, as I use the same computer for racing, gaming, and developing. It's really just personal preference and is totally up to you.
+
+User preferences and logs will be saved to ```user_name/AppData/Roaming```. This prevents the logs and preferences from being deleted during updates.
+
 ## How it works
 
 It reserves a network port on your machine and accepts web socket connection reqeusts. Once connected, the SDKWrapper-Service will send data via the web socket to be used in whatever way the client program wishes.
