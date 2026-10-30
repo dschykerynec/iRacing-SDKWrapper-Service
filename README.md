@@ -1,53 +1,102 @@
-This program interfaces with the iRacing SDK to get telemetry and other data and serve it to an arbitrary endpoint. It abstracts away the iRacing SDK and delivers the data to your application in a simple way so you can focus on building cool UIs (think RaceLab or iOverlay) or other useful tools. For example, I have built a simple telemetry UI called [open-overlay](https://github.com/dschykerynec/open-overlay) in Electron using this project.
+# iRacing-SDKWrapper-Service
+
+A .NET 8 background app that reads live telemetry from the iRacing SDK and streams it to any client over a local WebSocket, so you can build iRacing tools in whatever language or framework you like.
+
+> **Status: no longer in active development.** This service was the original backend for my [open-overlay](https://github.com/dschykerynec/open-overlay) app. Open-overlay has since moved to reading the SDK in-process to reduce latency (see [Lessons learned](#lessons-learned)). The service still works and the releases still install, but no new features are planned.
 
 ## Why this exists
 
-There are plenty of other projects that abstract away the lower levels of the iRacing SDK. So why am I building another one? The answer is that all of the existing solutions are tech-stack specific. There is a much fuller featured node.js implementation (that is unfortunately no longer actively developed). There is a python implementation. Funnily enough, this project is built on top of Nick Thissen's .NET [iRacing SDKWrapper](https://github.com/NickThissen/iRacingSdkWrapper). I'm sure there are implementations for other environments that I am unaware of.
+Plenty of projects already wrap the iRacing SDK, but each one is tied to a single tech stack: there's a Node.js library, a Python library, and the .NET [iRacingSdkWrapper](https://github.com/NickThissen/iRacingSdkWrapper) by Nick Thissen that this project builds on. To build an Electron UI you learn one library; to build a .NET tool you learn another.
 
-The technical side of the iRacing community is distributed across many niches. If you want to build, say, an Electron UI for iRacing, you'll have to learn the node.js library. If you want to build a separate .NET solution for some problem, you'll have to learn a .NET solution like. 
-
-This project, although in very early development, aims to solve this problem by offering a single solution for all platforms and tech-stacks. You could use this to build a windows form project in .NET, or an overlay in Electron.js as I have. Use it in a python project to do some data analysis on your races. Learn one library and use it everywhere. 
-
-Another significant motivation is that I like to build stuff and I like to learn. Building this and extending it as I need more data to build my own UI project is fun. It is unlikely that this will be a comprable solution to any of the above-mentioned projects any time soon.
-
-## Install
-
-Navigate to the [latest release](https://github.com/dschykerynec/iRacing-SDKWrapper-Service/releases/latest) page. Download and run the setup.exe file. That's all! The app will automatically update itself as I publish updates to the release page.
-
-The app itself installs to ```user_name/AppData/Local/```. I recommened adding the program executable run on windows startup. Alternatively, you can use [iRacingManager](https://members.iracing.com/jforum/posts/list/3633292.page?nc=1) to run it when iRacing is opened. This is the method I use. When I open iRacing, iRacingManager opens CrewChief, the VRS Telemetry logger, Trading Paints for liveries, iOverlay for their free live track map, and both this app and my simple-overlay. It also closes all these programs when the simulator is closed. I prefer having just iRacingManager running in the background rather than all of these programs, as I use the same computer for racing, gaming, and developing. It's really just personal preference and is totally up to you.
-
-User preferences and logs will be saved to ```user_name/AppData/Roaming```. This prevents the logs and preferences from being deleted during updates.
+This service puts one wrapper behind a WebSocket so that any client (Electron, a .NET WinForms app, a Python script for analyzing your races) can consume the same feed. Learn one interface and use it everywhere.
 
 ## How it works
 
-It reserves a network port on your machine and accepts web socket connection reqeusts. Once connected, the SDKWrapper-Service will send data via the web socket to be used in whatever way the client program wishes.
+```mermaid
+flowchart LR
+    A[iRacing SDK] -->|iRacingSdkWrapper| B[SDKService]
+    B -->|events| C[StartupService]
+    C -->|telemetry, sent immediately| D[WebSocketService]
+    C -->|state changes, queued| D
+    E[UserPreferencesService] -.->|settings| C
+    D -->|"JSON over ws://localhost:7125/sdk"| F[Any client<br/>Electron, .NET, Python…]
+```
 
-To interface with the iRacing SDK, it makes use of the above-mentioned SDKWrapper from Nick Thissen. The base iRacing SDK is written in C and C++, but Nick's wrapper is graciously written in C#, a programming language for actual humans.
+The app is an ASP.NET Core host with four services registered through dependency injection. Except for `UserPreferencesService`, they are event-driven:
 
-There are a few services that handle the different responsibilities of the program. Excepting the UserPreferencesService, they are all event driven.
-- SDKService
-    - interfaces with the iRacingSDKWrapper to manage the iRacing SDK isntance. Gets telemetry data, emits events when updates happen.
-- WebSocketService
-    - manages the web socket connection(s) and sends the data from the SDKService to the client
-- StartupService
-    - handles events from all services and passes data from SDKService to the WebSocketService. This ensures a solid decoupling of responsibilities between the two.
-    - Handles queueing of important events to be sent when the client is connected. For example, the first time the user gets on track, or when the user enters the garage. 
-- UserPrefrencesService
-    - manages a userPreferences.json file in the AppData directory. creates the file if it doesn't exist yet, loads it when it does exist, and updates the values when they are changed.
-    - acts as a shared state from which all other services in the program should use to access user preferences
+- **SDKService** manages the iRacing SDK connection through iRacingSdkWrapper and raises events when telemetry updates or the sim opens and closes.
+- **StartupService** subscribes to every other service and routes data between them, so the SDK and WebSocket layers never reference each other directly.
+- **WebSocketService** accepts a client connection and sends each message as JSON.
+- **UserPreferencesService** loads and saves `userPreferences.json` and acts as shared state for settings.
 
-## Updates
-The app uses [Velopack](https://github.com/velopack/velopack), (built off a fork of [squirrel.Windows](https://github.com/Squirrel/Squirrel.Windows)) to automatically download and install updates.
+**Two features keep CPU usage down:**
 
-To simplify development this process is currently non-optional and non-interactive. If an update exists, it will install itself on program start. You will get a popup notifying you that the update is downloading, but there is no way to run the program if you stop this update process. If this is a concern to you, inspect the update code yourself in [Program.cs](iRacing SDKWrapperService/Program.cs). The releases are built from the source code in the repo and download from the [Releases]() page in this repo. It is defaulted to always install the latest non-pre-release release. 
+- **Adaptive polling.** The service reads telemetry once per second while you're off track, then switches to your configured rate (20 Hz by default) when you get on track.
+- **Event queue.** State changes such as on-track/off-track are queued and delivered when a client is connected, so a UI that connects late still learns the current state. Time-sensitive data like pedal inputs skips the queue and is sent immediately.
 
-If you do not want the automatic updates and new features as I add them, you can clone the repo, remove the update code from Program.cs, and build your own executable.
+## Connecting a client
 
-## Roadmap
+Connect to `ws://localhost:7125/sdk`. Every message is JSON shaped like `{ "name": "...", "value": ... }`. The service supports one client at a time; a new connection replaces the old one.
 
-While this is mainly a fun side-project for learning, I do plan to update it (in a probably irregular fashion) as I need new features to support my open-overlay UI. Below are my current priorities roughly in order from top to bottom.
+| `name` | When it's sent | `value` |
+| --- | --- | --- |
+| `sdk-connected` | When your client connects | Status message |
+| `game-opened` | When iRacing starts | Status message |
+| `game-closed` | When iRacing closes | Status message |
+| `is-on-track` | When your car enters or leaves the track | `true` / `false` |
+| `TelemetryDictionary` | Every telemetry tick | Throttle, brake, steering angle, speed, gear (with units), and last lap time when a lap completes |
 
-- data for displaying standings
-- data for displaying relative position and deltas
+Minimal JavaScript client:
 
-I am of course open to feedback or suggestions, and can be reached at <simple.overlay.dev@gmail.com>
+```js
+const ws = new WebSocket('ws://localhost:7125/sdk')
+ws.onmessage = (event) => {
+  const { name, value } = JSON.parse(event.data)
+  if (name === 'TelemetryDictionary') {
+    console.log(value.ThrottleInputValue, value.BrakeInputValue)
+  }
+}
+```
+
+## Install
+
+Download and run `setup.exe` from the [latest release](https://github.com/dschykerynec/iRacing-SDKWrapper-Service/releases/latest). The app installs to `%LocalAppData%` and runs in the background.
+
+To start it automatically, add it to Windows startup or launch it alongside iRacing with a tool like iRacingManager.
+
+**Files:** user preferences and logs are stored in `%AppData%\iRacing-SDKWrapper-Service`, so updates never overwrite them. Edit `userPreferences.json` there to change the port (`PortNumber`, default `7125`) or the on-track telemetry rate (`TelemetryUpdateFrequency` in Hz, default `20`).
+
+### Automatic updates
+
+Installed copies update themselves with [Velopack](https://github.com/velopack/velopack). On startup the app checks the Releases page and, if a newer stable release exists, downloads it, installs it, and restarts. This step is required for installed copies: you'll see a notice while it downloads, and the app won't run if the update is cancelled. Builds you compile yourself skip the update check entirely.
+
+## Building from source
+
+**Requirements:** Windows, the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0), and iRacing (the SDK only provides data while the sim is running).
+
+The iRacingSdkWrapper DLLs aren't on NuGet and aren't committed to this repo. Download them from the [iRacingSdkWrapper repository](https://github.com/NickThissen/iRacingSdkWrapper) and place them here, next to the solution file:
+
+```
+packages/
+  iRacingSdkWrapper/
+    iRacingSdkWrapper.dll
+    iRSDKSharp.dll
+    YamlDotNet.dll
+```
+
+Then build and run:
+
+```bash
+dotnet build
+dotnet run --project "iRacing SDKWrapper Service"
+```
+
+## Lessons learned
+
+This design made the data available to any language, but every telemetry update had to be serialized to JSON, sent through a socket, and parsed again on the other side. For pedal and steering traces, even small delays make an overlay feel out of sync with the car.
+
+In practice, the WebSocket hop made open-overlay's traces noticeably laggy, so I moved SDK reading into open-overlay's Electron main process and used in-process IPC instead. The trade-off was giving up language independence for lower latency, which was the right call for a real-time overlay. This service would still suit tools where a short delay doesn't matter, such as logging laps or analyzing races after the fact.
+
+## License
+
+[GPL-3.0](LICENSE). Built on [iRacingSdkWrapper](https://github.com/NickThissen/iRacingSdkWrapper) by Nick Thissen.
